@@ -1,0 +1,40 @@
+@startuml
+actor User
+participant Deployment
+participant Background
+collections Modules
+database DB
+
+== New Appointment Booking Flow ==
+
+note over User : Client/Admin
+User -> Deployment : New Appointment Booking
+Deployment -> Background : Handle Pubsub Event's Workflow
+note over Modules : Service Now Integration
+alt If ServiceNow Intergation
+Background -> Modules : Create New Incident
+alt If Successful 
+note over Modules: Send Email with Ticket Details
+else If UnSuccessFul
+note over Modules: Send Email without Ticket Details
+Modules -> DB : Store Retry Details in DB
+Modules <-- DB
+end
+Background <-- Modules
+end
+Deployment <-- Background
+
+== Background Cron Flow ==
+
+note over Background: Cron to Retry 2 times in Every 5 minutes
+Background -> DB : Fetch Details (where retryCount < 2)
+Background <-- DB
+Background -> Modules : Create New Incident
+alt If Successful
+note over Modules : Send Ticket Details 0ver Email
+note over Modules : Mark Retry Details as Deleted
+else If Unsuccessful 
+note over Modules : Increase Retry Count by 1
+end
+Background <-- Modules
+@enduml

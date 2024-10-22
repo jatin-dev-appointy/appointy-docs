@@ -1,0 +1,284 @@
+title Notification Email Flow
+participant Deployment
+participant Background
+participant "Tasklist - Email" as EmailTasklist
+participant "<link:https://gitlab.com/appointy/waqt/service-now>appointy/waqt/service-now</link>" as ServiceServiceNow
+participant "<link:https://github.com/AppointyTech/saastack-Backend-slug>saastack/slug</link>" as ServiceSlug
+participant "<link:https://github.com/AppointyTech/saastack-Backend-company>saastack/company</link>" as ServiceCompany
+participant "<link:https://github.com/AppointyTech/saastack-Backend-location>saastack/location</link>" as ServiceLocation
+participant "<link:https://gitlab.com/appointy/waqt/intake-form>appointy/waqt/intake-form</link>" as ServiceIntakeForm
+participant "<link:https://github.com/AppointyTech/saastack-Backend-user>saastack/user</link>" as ServiceUser
+participant "<link:https://github.com/AppointyTech/saastack-Backend-company-settings>saastack/company-settings</link>" as ServiceCompanySettings
+participant "<link:https://github.com/AppointyTech/saastack-Backend-app>saastack/app</link>" as ServiceApp
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-receiver>saastack/notification-receiver</link>" as ServiceNotificationReceiver
+participant "<link:https://github.com/AppointyTech/saastack-Backend-booking-portal-settings>saastack/booking-portal-settings</link>" as ServiceBookingPortalSettings
+participant "<link:https://github.com/AppointyTech/saastack-Backend-role>saastack/role</link>" as ServiceRole
+participant "<link:https://github.com/AppointyTech/saastack-Backend-customer>saastack/customer</link>" as ServiceCustomer
+participant "<link:https://github.com/AppointyTech/saastack-Backend-staff-profile>saastack/staff-profile</link>" as ServiceStaffProfile
+participant "<link:https://github.com/AppointyTech/saastack-Backend-employee>saastack/employee</link>" as ServiceEmployee
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-configuration>saastack/notification-configuration</link>" as ServiceNotificationConfig
+participant "<link:https://github.com/AppointyTech/saastack-Backend-template>saastack/template</link>" as ServiceTemplate
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-receiver>saastack/notification-receiver</link>" as ServiceNotificationReceiver
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-preferences>saastack/notification-preferences</link>" as ServiceNotificationPreferences
+participant "<link:https://gitlab.com/appointy/waqt/service-settings>appointy/waqt/service-settings</link>" as ServiceServiceSetting
+participant "<link:https://gitlab.com/appointy/waqt/appointment-booking-flow-settings>appointy/waqt/appointment-booking-flow-settings</link>" as ServiceAptBookingFlowSetting
+participant "<link:https://github.com/AppointyTech/saastack-Backend-data-codes>saastack/data-codes</link>" as ServiceDataCodes
+participant "<link:https://github.com/AppointyTech/saastack-Backend-extended-fields>saastack/extended-fields</link>" as ServiceExtendedFields
+participant "<link:https://github.com/AppointyTech/saastack-Backend-extended-fields-submission>saastack/extended-fields-submission</link>" as ServiceExtendedFieldsSubmission
+participant "<link:https://github.com/AppointyTech/saastack-Backend-order>saastack/order</link>" as ServiceOrder
+participant "<link:https://gitlab.com/appointy/waqt/payments-manager>appointy/waqt/payments-manager</link>" as ServicePaymentsManager
+participant "<link:https://github.com/AppointyTech/saastack-Backend-calendar-integration>saastack/calendar-integration</link>" as ServiceCalendarIntegration
+participant "<link:https://github.com/AppointyTech/saastack-Backend-email-sender>saastack/email-sender</link>" as ServiceEmailSender
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-logs>saastack/notification-logs</link>" as ServiceNotificationLogs
+Deployment->Background:Create Appointment (Async)
+Background->Background:Create Appointment Background\n
+Background->EmailTasklist:Received by EmailTasklist\n\n(EVENT_Appointments_CreateAppointment_Background)\n
+==Workflow Started (Appointment Created)==
+note over EmailTasklist:Service-Now Integration
+EmailTasklist->ServiceSlug:GetSlug - To Check IsJNJ (via LocationId)
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceServiceNow:IsJnJ - To Check whether that slug is JNJ location
+EmailTasklist<-ServiceServiceNow:
+space
+group GetBusinessDetails() - Fetch Business Details
+EmailTasklist->ServiceCompany:GetCompany - To Fill Business Details
+EmailTasklist<-ServiceCompany:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via companyId)
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceLocation:GetLocation - To Fill business Details (via locationId)
+EmailTasklist<-ServiceLocation:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via locationId)
+EmailTasklist<-ServiceSlug:
+end
+space
+group helpers.AppointmentFormSubmission() - Fetch Information Before Ticket Creation
+EmailTasklist->ServiceIntakeForm:ListIntakeFormSubmissions - List Submissions
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:BatchGetIntakeForms - List Forms
+EmailTasklist<-ServiceIntakeForm:
+end
+space
+EmailTasklist->ServiceServiceNow:ConfigAnswers - Convert hardcoded answers in another languages
+EmailTasklist<-ServiceServiceNow:
+space
+EmailTasklist->ServiceSlug:GetSlug - To be used in CreateServiceNowIncident request.
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceUser:GetUserProfile - Fetch CreatedBy to be filled in Ticket using userId in appointment
+EmailTasklist<-ServiceUser:
+space
+alt If New Ticket
+EmailTasklist->ServiceServiceNow:CreateServiceNowIncident - Service Now API call
+EmailTasklist<-ServiceServiceNow:Ticket Info
+space
+group UpdateTicketDetailsInAppointment()
+EmailTasklist->ServiceIntakeForm:ListIntakeFormSubmissions - Fetch Pre Appointment values\n
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:BatchGetIntakeForms - Fetch corresponding Intake Forms for the submissions.
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:UpdateIntakeFormSubmission - Fill Updated Ticket Value in  Appointment Intake Form Submissions.
+EmailTasklist<-ServiceIntakeForm:
+end
+else 
+EmailTasklist->ServiceServiceNow:AddCommentInIncident - If Existing TicketId is there in form
+EmailTasklist<-ServiceServiceNow:
+end
+space
+space
+note over EmailTasklist:Create Appointment Email Sending Flow
+EmailTasklist->ServiceCompanySettings:GetCompanySetting - Fetch Company Customization (SendIndividualMailForEachCartItem)
+EmailTasklist<-ServiceCompanySettings:
+space
+EmailTasklist->ServiceApp:ListAppsOfCompany - Check if Meetings App is Installed
+EmailTasklist<-ServiceApp:
+space
+group notSetting() - Fetch Notification and Notification Event Settings
+EmailTasklist->ServiceNotificationReceiver:GetNotificationSettings - Check Email Channel Enabled or Not
+EmailTasklist<-ServiceNotificationReceiver:
+space
+EmailTasklist->ServiceNotificationReceiver:GetNotificationEventSettings - Check Event Setting enabled for Admin or Client
+EmailTasklist<-ServiceNotificationReceiver:
+end
+space
+EmailTasklist->ServiceBookingPortalSettings:GetBookingPortalSetting - Fetch Setting to send in appointment binding (KeepBranding)
+EmailTasklist<-ServiceBookingPortalSettings:
+space
+group GetBusinessDetails() - Fetch Business Details
+EmailTasklist->ServiceCompany:GetCompany - To Fill Business Details
+EmailTasklist<-ServiceCompany:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via companyId)
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceLocation:GetLocation - To Fill business Details
+EmailTasklist<-ServiceLocation:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via locationId)
+EmailTasklist<-ServiceSlug:
+end
+space
+group GetBusinessOwner() - Get User Profile of Business Owner
+EmailTasklist->ServiceRole:ListDefaultRole - To Fetch Owner roleId from masters
+EmailTasklist<-ServiceRole:
+space
+EmailTasklist->ServiceRole:GetUsersByLevelId - To Fetch Owner UserId (via GroupId)
+EmailTasklist<-ServiceRole:
+space
+EmailTasklist->ServiceUser:GetUserProfile - To Fetch User profile (via UserId)
+EmailTasklist<-ServiceUser:
+end
+space
+EmailTasklist->ServiceCompanySettings:GetCompanySetting - Fetch Company Customization (DonotSendPastBookingEmailToAdmin)
+EmailTasklist<-ServiceCompanySettings:
+space
+EmailTasklist->ServiceApp:ListAppsOfCompany - Check if AppointyX App is Installed, Also Passed later in sendAppointmentMail()
+EmailTasklist<-ServiceApp:
+space
+group FillConsumer()
+EmailTasklist->ServiceCustomer:BatchGetCustomer - Fetch Customer Information based on Appointment Consumers
+EmailTasklist<-ServiceCustomer:
+EmailTasklist->EmailTasklist:Process CustomerID to Customer Map, UserId to Customer Map 
+end
+space
+EmailTasklist->ServiceUser:BatchGetUserProfile - Get User Profiles of StatusUpdateUserIds (via userIds from Appointment)
+EmailTasklist<-ServiceUser:
+space
+EmailTasklist->ServiceStaffProfile:BatchGetStaffProfile - Get Staff Profile Data (via Employees from Appointment)
+EmailTasklist<-ServiceStaffProfile:
+space
+EmailTasklist->ServiceEmployee:BatchGetEmployee - Get Employee Data (via employeeIds from Appointment)
+EmailTasklist<-ServiceEmployee:
+space
+group GetNotificationConfiguration()
+EmailTasklist->ServiceNotificationConfig:GetNotificationConfigurationByBusiness - Fetch any Overriden Configuration present for the BusinessId (Else, send default configuration)
+EmailTasklist<-ServiceNotificationConfig:
+space
+EmailTasklist->ServiceApp:ListAppsOfCompany - Check if Appointment App or Meeting App is Installed
+EmailTasklist<-ServiceApp:
+space
+EmailTasklist->ServiceTemplate:ListTemplatesByTemplateType - Fetch Template Information such as Client or Admin Side
+EmailTasklist<-ServiceTemplate:
+space
+EmailTasklist->ServiceNotificationReceiver:BatchGetNotificationReceiverByTemplate - Fetch Template Notification Receivers, such as roles to which email is sent
+EmailTasklist<-ServiceNotificationReceiver:
+space
+loop for each receiver
+group FindUsersOfRole() - Users email which need to be included in ReplyTo in Email
+EmailTasklist->ServiceRole:BatchGetUsersByRoles - Get ReployTo Roles which are present in the receiver
+EmailTasklist<-ServiceRole:
+space
+EmailTasklist->ServiceRole:BatchGetUserDetailsByIds - Get UserProfile to get Emails of users (via UserId)
+EmailTasklist<-ServiceRole:
+end
+end
+space
+group GetNotificationReceivers() - Process Map like UserMap, Email Map etc. of all users in each receivers
+loop for each receiver
+EmailTasklist->ServiceRole:BatchGetUsersByRoles - Get Roles which are present in the receiver
+EmailTasklist<-ServiceRole:
+end
+end
+space 
+EmailTasklist->ServiceNotificationPreferences:BatchGetUserNotificationPreference - Fetch Preferences for a user like opt-in channel type (in the same business).
+EmailTasklist<-ServiceNotificationPreferences:
+end
+space
+alt If AppointyX App installed
+EmailTasklist->ServiceServiceSetting:BatchGetServiceSetting - Fill Service Settings Map
+EmailTasklist<-ServiceServiceSetting:
+end
+space
+EmailTasklist->ServiceAptBookingFlowSetting:GetAppointmentBookingFlowSetting - To Fetch setting for appointment bindings (showStaff)
+EmailTasklist<-ServiceAptBookingFlowSetting:
+space
+loop for each unique (userId) in notifConfiguration.ClientUserIdsToSend / notifConfiguration.AdminUserIdsToSend
+group sendAppointmentMail()
+EmailTasklist->ServiceUser:GetUserProfile - Get User Profile data - To get user email and other email selected Data.
+EmailTasklist<-ServiceUser:
+space 
+EmailTasklist<-EmailTasklist: Process Additionally Email Related Information like Timezone and Bindings
+space
+alt If Client Side Email Generation
+EmailTasklist->ServiceDataCodes:GenerateCode - Generate Code to be sent in Email (DataCodeTypeCancelAppointment)
+EmailTasklist<-ServiceDataCodes:
+space 
+EmailTasklist->ServiceDataCodes:GenerateCode - Generate Code to be sent in Email (DataCodeTypeUpdateAppointment
+EmailTasklist<-ServiceDataCodes:
+space
+EmailTasklist->ServiceDataCodes:GenerateCode - Generate Code to be sent in Email (DataCodeTypeUpdateConsumerRsvp
+EmailTasklist<-ServiceDataCodes:
+space
+else Else, If Admin Side
+EmailTasklist->ServiceDataCodes:GenerateCode - Generate Code to be sent in Email (DataCodeTypeStaffAppointment
+EmailTasklist<-ServiceDataCodes:
+end
+space
+group helpers.AppointmentFormSubmission() - Fetch an Intake form key-value which sent in email
+EmailTasklist->ServiceIntakeForm:ListIntakeFormSubmissions - List Submissions
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:BatchGetIntakeForms - List Forms
+EmailTasklist<-ServiceIntakeForm:
+end
+space
+group helpers.AppointmentExtendedFieldsSubmission() - Sent in Email data as bindings
+EmailTasklist->ServiceExtendedFields:GetExtendedFieldSubmissionByEntityId - List Appointment Extended Fields Submissions (via AppointmentId)
+EmailTasklist<-ServiceExtendedFields:
+space
+EmailTasklist->ServiceExtendedFieldsSubmission:ListExtendedField - List Extended Fields (via groupId)
+EmailTasklist<-ServiceExtendedFieldsSubmission:
+end
+space
+EmailTasklist->EmailTasklist:Form Appointment Bindings Map to be sent in Email
+space
+group helpers.GetUnbranding()
+EmailTasklist->ServiceCompanySettings:GetCompanySetting - Fetch Company Customization (Unbranding.GetCalendarInviteSubject, HideDescriptionInCalendar)
+EmailTasklist<-ServiceCompanySettings:
+space 
+EmailTasklist->ServiceNotificationReceiver:GetNotificationSettings - Check for SkipIcs, SkipIcsAdmin, SkipIcsClient
+EmailTasklist<-ServiceNotificationReceiver:
+space
+EmailTasklist->ServiceCompany:GetCompany - To Fill Branding in Email
+EmailTasklist<-ServiceCompany:
+space
+EmailTasklist->ServiceLocation:GetLocation - To Fill Branding in Email
+EmailTasklist<-ServiceLocation:
+end
+space
+group GetPaymentLinkForBinding()
+EmailTasklist->ServiceServiceSetting:BatchGetServiceSetting - Fill Service Settings Map with some Service Level Payment Settings
+EmailTasklist<-ServiceServiceSetting:
+space 
+EmailTasklist->ServiceOrder:GetOrdersByItemId - Fetch Order Information (via AppointmentId)
+EmailTasklist<-ServiceOrder:
+space 
+EmailTasklist->ServicePaymentsManager:GeneratePaymentRequest - Generate Payments link using its response
+EmailTasklist<-ServicePaymentsManager:
+end
+space 
+EmailTasklist->ServiceCalendarIntegration:BatchGetCalendarSettings - Check if Calendar is Connected, Based on this add ICS in Email
+EmailTasklist<-ServiceCalendarIntegration:
+space 
+group sendMailToRecipientIn()
+EmailTasklist->ServiceTemplate:RenderTemplate - Load Template Subject and Body in terms of bindings and template event data
+EmailTasklist<-ServiceTemplate:
+space 
+EmailTasklist->ServiceEmailSender:SendEmail - Send on User's Email
+EmailTasklist<-ServiceEmailSender:
+space 
+EmailTasklist->ServiceNotificationLogs:CreateNotificationLog - Create Notification Log
+EmailTasklist<-ServiceNotificationLogs:
+end
+end
+end
+space
+==Workflow End (Appointment Created)==
+Background<-EmailTasklist:
+Deployment<--Background:

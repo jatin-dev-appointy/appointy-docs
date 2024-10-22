@@ -1,0 +1,40 @@
+title Background Service
+actor User
+participant "go.appointy.com/waqt/appointment" as AppointmentService
+participant "go.saastack.io/eventspush" as EventPushService
+participant "gocloud.dev/pubsub" as PubSubService
+participant Background
+participant EmailTaskList
+participant SmsTaskList
+==Background Code - fx.Lifecysle - OnStart()==
+loop for every tasklist in (fx.go)
+note over Background:define\n- []WorkflowProcessorFunc against an EventType
+end
+==Event Initialization==
+User->AppointmentService:Books an Appointment
+AppointmentService->EventPushService:Push() - Push event to Pubsub Queue (with a TYPE)
+EventPushService->PubSubService:(*pubsub.Topic).Send()
+EventPushService<--PubSubService:
+AppointmentService<--EventPushService:
+User<--AppointmentService:Success Response
+note over User,PubSubService:Booking Successful. Resonse Sent to the User.
+==Background Processing ==
+PubSubService->(5)Background:(*pubsub.Subscription).Receive()\nIt receives a message containes marshalled Event object.\n\n
+group Process()
+Background->Background:Unmarshal (*pubsub.Message) to Event object
+note over Background:Eg. Event object - \n{\n Id: 'evt_...',\n Type: '.appointy.appointment.v1.Appointments.CreateAppointment'\n}
+group Fetch Cadence Workflow for (EventType)
+loop for each workflow
+alt if (Workflow.TaskList == Email)
+Background->EmailTaskList:cli.ExecuteWorkflow() - Cadence Client will Execute workflow on this tasklist.
+EmailTaskList->EmailTaskList:
+else else if (Workflow.TaskList == Sms)
+Background->SmsTaskList:cli.ExecuteWorkflow() - Cadence Client will Execute workflow on this tasklist.
+else else ...
+note right of Background:any other tasklist
+end
+end
+end
+Background->Background:(*pubsub.Message).Ack() - Acknowledge Pubsub Message
+end
+==Flow End==

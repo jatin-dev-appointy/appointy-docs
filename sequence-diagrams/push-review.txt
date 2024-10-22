@@ -1,0 +1,86 @@
+title PushReviews
+participant Background
+database CustomStatusStore
+database AppointmentStore
+database UserProfileStore
+participant "<link:https://github.com/AppointyTech/saastack-Backend-app.git >go.saastack.io/app</link>" as AppService
+participant "<link:https://gitlab.com/saastack/backend/review-mail-setting.git>go.saastack.io/review-mail-setting</link>" as ReviewEmailSettingService
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-receiver>saastack/notification-receiver</link>" as ServiceNotificationReceiver
+participant "<link:https://github.com/AppointyTech/saastack-Backend-review.git >go.saastack.io/review</link>" as ReviewService
+participant "<link:https://gitlab.com/appointy/waqt/appointment.git>go.appointy.com/waqt/appointment</link>" as AppointmentService
+Background->Background:PushReviews() Cron: (*/15 * * * *)
+==Workflow Started==
+group getLocationAppointmentReviews()
+Background->CustomStatusStore:GetCustomStatus() - Get details of 'No Show' Custom Status
+Background<-CustomStatusStore:
+space
+Background->AppointmentStore:ListAppointments() - List Confirmed Appointments b/w StartTime and EndTime
+Background<-AppointmentStore:
+space
+note over Background:define variables:\n\n- locReviews map against locationId : map[string][]*ReviewData\n( a location may contain multiple reviews against each appointment consumer)\n\n- emails array: []string (contains consumer's email against each appointment)
+loop for each appointment=
+alt for each consumer
+alt if appointment Custom Status isn't 'No Show'
+Background->Background:fill values:\n- locReviews[locationId] = ReviewData (contains appointment info)\n- fill consumerEmails in emails
+end
+end
+end
+space
+Background->UserProfileStore:ListUserProfiles() - For all Emails, Fetch UserIds to fill in ReviewData.\n
+Background<-UserProfileStore:
+space
+loop for every location in locReviews
+loop for each review data
+Background->Background:Replace UserEmail -> UserId
+end
+end
+end
+space
+note over Background:define variables:\n\n- appInstallValue := map[string]bool{}\n(this holds true, if either of appointment or review not installed)
+space
+loop for every location in locReviews
+alt if appInstall[companyId] value doesn't exist
+group helpers.ListAppsActivity()
+Background->AppService:ListApp() - List All Apps for the company
+Background<-AppService:
+end
+space
+Background->Background:fill value \n- appInstallValue: (!review || !appointment)
+end
+space
+alt if appInstall[companyId] == true
+Background->Background:continue, (since appointment or review not exist)
+end
+space
+Background->ReviewEmailSettingService:GetReviewMailSetting() - For CompanyId, Get Review Mail Setting for app - [Appointments]
+Background<-ReviewEmailSettingService:
+space
+loop for each review data
+group SendReviewEmail()
+space
+group notSetting() - Fetch Notification and Notification Event Settings
+Background->ServiceNotificationReceiver:GetNotificationSettings - Check Email Channel Enabled or Not (via locationId)
+Background<-ServiceNotificationReceiver:
+space
+Background->ServiceNotificationReceiver:GetNotificationEventSettings - Check Event Setting enabled for Client
+Background<-ServiceNotificationReceiver:
+end
+space
+group helpers.ListAppsActivity() - To Fetch Appointment AppId
+Background->AppService:ListApp() - List All Apps for the company
+Background<-AppService:
+end
+space
+Background->ReviewService:GetReviewPageSetting() - For Data Purpose in Email
+Background<-ReviewService:
+space
+Background->AppointmentService:GetAppointment() - Fetch Appointment Details
+Background<-AppointmentService:
+space
+note over Background: Calculate Other Info...
+Background->Background:Send Email()
+note right of Background:.\n.\n.
+end
+end
+end
+==Workflow End==

@@ -1,0 +1,44 @@
+title Websocket Ideal Flow
+
+participant Client
+participant Server
+participant Pubsub Subscription
+
+==Connection Initialization and Request Upgradation==
+Client->Server:Connect (t=0s) - WebSocket connection request
+Client<-Server:Switching Protocols (t=0s) - Server upgrades connection
+space
+note over Server:SetReadDeadline() - 30s 
+alt ConnectionInit not received from Client
+Clientx-Server:Close (t=30s) - { "type": "Close", "reason": "Read timeout: No connection_init message received" }
+else ConnectionInit received from Client
+
+ 
+Client->Server:ConnectionInit (t=0s) - { "type": "connection_init" }
+Client<-Server:Acknowledgement (t=0s) - { "type": "connection_ack" } 
+
+space
+Server->Client:Ping (t=25s) - { "type": "ping" }
+alt Pong Received
+Client->Server:Pong (t=25s) - { "type": "pong" }  
+Server->Server:SetReadDeadline() - time.Now()+30s
+else 
+Clientx-Server:Close (t=30s) - { "type": "Close", "reason": "Read timeout: No Message received" }
+end
+
+space
+Server->Client:Ping (t=50s) - { "type": "ping" }
+alt Pong Received
+Client->Server:Pong (t=50s) - { "type": "pong" }  
+Server->Server:SetReadDeadline() - time.Now()+30s
+else 
+Clientx-Server:Close (t=55s) - { "type": "Close", "reason": "Read timeout: No Message received" }
+end
+
+end
+
+space
+==Pubsub Event Receive==
+Pubsub Subscription->(3)Server:Receive Message
+Server->Server:Check Message Type, Execute Query()
+Server->Client:Send Data - { "type": "ping" }

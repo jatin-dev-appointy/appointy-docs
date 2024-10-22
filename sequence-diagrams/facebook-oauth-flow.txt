@@ -1,0 +1,34 @@
+title Facebook OAuth Flow
+participant User
+participant UI Client
+participant API Server
+participant HydraServer
+==Start==
+User->UI Client:User Starts Login Process
+UI Client->API Server:/loginconsent/login/
+UI Client<-API Server:Fill Info in Config, For External SSO's
+User<-UI Client:
+space
+User->UI Client:Facebook Login Flow
+UI Client->API Server:handle **ExternalSignIn()** - loginconsent/external/auth?login_challenge=&provider=facebook
+API Server->HydraServer:GetLoginRequest() - To verify LoginChallenge, and check for some errors, or any existing session already exist
+API Server<-HydraServer:
+note over API Server:- Set Some Cookies like providerKey, loginChallengeKey]
+group OAuth.SignIn()
+API Server->API Server:**Set Some Values** \n- Cookie - state\n- RedirectURI - /loginconsent/external/auth/callback\n\n\n**Form Auth URL like below, with values from Config:**\n\nhttps://www.facebook.com/v3.2/dialog/oauth?client_id=9376276093\n&redirect_uri=https%3A%2F%2Fdev-waqt.appointy.com%2Floginconsent%2Fexternal%2Fauth%2Fcallback\n&response_mode=query\n&response_type=code\n&scope=email\n&state=a5aef6b8-b79b-4479-8438-705f995b80d6\n\n**Redirect()**\n
+end
+UI Client<-API Server:
+User<-UI Client:
+space
+User->UI Client:Facebook Callback\n
+UI Client->API Server:handle **ExternalSignInCallback** - /loginconsent/external/auth/callback?code=&state=
+note over API Server:- Verify Cookies - providerKey, loginChallengeKey]
+group OAuth.SignInCallback()
+API Server->API Server:**Steps:**\n\n- Verify Cookie - state\n\n- Extract Values from callback like - Code, Error (if any)\n\n- OAuth.Exchange(in.Code) - Fetch Token From Code \n\n- Fetch UserInfo From Token, (*UserInfoClaims)\n  - contains email, name according to the scope\n\n- Check in Appointy's User Store\n  - If User Profile Exist -> Create External Login, Update any user field (if missing)\n  - If Not, Create a new User Profile, with roles and rights
+API Server->HydraServer:AcceptLoginRequest()
+API Server<-HydraServer:SuccessFul Login. (redirect to hydra callback)
+end
+UI Client<-API Server:
+User<-UI Client:
+note over User:Handle the Callback of Hydra with Consent.\n.\n.\nProcess Further as a usual flow !!!\n.\n.
+==Done ==
