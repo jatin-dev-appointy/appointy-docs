@@ -1,0 +1,83 @@
+title Notification Email Flow
+participant Deployment
+participant Background
+participant "Tasklist - Email" as EmailTasklist
+
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-receiver>saastack/notification-receiver</link>" as ServiceNotificationReceiver
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-configuration>saastack/notification-configuration</link>" as ServiceNotificationConfig
+participant "<link:https://github.com/AppointyTech/saastack-Backend-template>saastack/template</link>" as ServiceTemplate
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-receiver>saastack/notification-receiver</link>" as ServiceNotificationReceiver
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-preferences>saastack/notification-preferences</link>" as ServiceNotificationPreferences
+participant "<link:https://github.com/AppointyTech/saastack-Backend-email-sender>saastack/email-sender</link>" as ServiceEmailSender
+participant "<link:https://github.com/AppointyTech/saastack-Backend-notification-logs>saastack/notification-logs</link>" as ServiceNotificationLogs
+
+
+Deployment->Background:Event Object sent through PubSub
+
+Background->Background:1. Decode Event Object Received.\n2. Check EventType and Workflows Associated with it.
+note over EmailTasklist:For the received Event, An Email workflow exists..
+EmailTasklist->EmailTasklist:Start Relevant Workflow.
+==Email Workflow Started ==
+space
+
+group notSetting() - Fetch Notification and Notification Event Settings
+EmailTasklist->ServiceNotificationReceiver:GetNotificationSettings - Check Email Channel Enabled or Not
+EmailTasklist<-ServiceNotificationReceiver:
+space
+EmailTasklist->ServiceNotificationReceiver:GetNotificationEventSettings - Check Event Setting enabled for Admin or Client
+EmailTasklist<-ServiceNotificationReceiver:
+end
+space
+
+group GetNotificationConfiguration()
+EmailTasklist->ServiceNotificationConfig:GetNotificationConfigurationByBusiness - Fetch any Overriden Configuration present for the BusinessId (Else, send default configuration)
+EmailTasklist<-ServiceNotificationConfig:
+space
+
+EmailTasklist->ServiceTemplate:ListTemplatesByTemplateType - Fetch Template Information such as Client or Admin Side
+EmailTasklist<-ServiceTemplate:
+space
+EmailTasklist->ServiceNotificationReceiver:BatchGetNotificationReceiverByTemplate - Fetch Template Notification Receivers, such as roles to which email is sent
+EmailTasklist<-ServiceNotificationReceiver:
+space
+
+
+space 
+EmailTasklist->ServiceNotificationPreferences:BatchGetUserNotificationPreference - Fetch Preferences for a user like opt-in channel type (in the same business).
+EmailTasklist<-ServiceNotificationPreferences:
+end
+
+
+space
+loop for each unique (userId) in notifConfiguration.ClientUserIdsToSend / notifConfiguration.AdminUserIdsToSend
+group sendAppointmentMail()
+EmailTasklist<-EmailTasklist:Get User Info, who will receive the notification
+space
+
+
+
+
+group helpers.GetUnbranding()
+EmailTasklist->ServiceNotificationReceiver:GetNotificationSettings - Check for SkipIcs, SkipIcsAdmin, SkipIcsClient
+EmailTasklist<-ServiceNotificationReceiver:
+end
+
+space 
+
+
+group sendMailToRecipientIn()
+EmailTasklist->ServiceTemplate:RenderTemplate - Load Template Subject and Body in terms of bindings and template event data
+EmailTasklist<-ServiceTemplate:
+space 
+EmailTasklist->ServiceEmailSender:SendEmail - Send on User's Email
+EmailTasklist<-ServiceEmailSender:
+space 
+EmailTasklist->ServiceNotificationLogs:CreateNotificationLog - Create Notification Log
+EmailTasklist<-ServiceNotificationLogs:
+end
+end
+end
+space
+==Workflow End==
+Background<-EmailTasklist:
+Deployment<--Background:
