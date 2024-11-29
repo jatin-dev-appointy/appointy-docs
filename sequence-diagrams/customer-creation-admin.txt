@@ -1,0 +1,26 @@
+title Admin Side Customer Creation Flow
+
+actor BusinessOwner
+participant Deployment
+participant CustomerModule
+participant UserModule
+participant Background
+
+==Admin Side==
+
+BusinessOwner->Deployment:Create Customer API call
+Deployment->CustomerModule:CreateCustomer(): with email xyz@gmail.com
+CustomerModule->UserModule:GetUserProfileByEmail(): Get User with Email: xyz@gmail.com
+CustomerModule<-UserModule: return user (if not exist, create new)
+space
+
+CustomerModule->CustomerModule:Assign Customer Role to the User
+Deployment<-CustomerModule:
+BusinessOwner<-Deployment:
+space
+
+
+==Client Side==
+CustomerModule->(02)Background:Event: New Customer Added
+note over Background#edede8:Send Email To Customer (Template can be customized)
+====

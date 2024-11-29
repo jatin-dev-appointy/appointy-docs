@@ -1,0 +1,38 @@
+title Client Side Customer Creation Flow
+
+actor External User
+participant BookingPortal
+participant AppointmentModule
+participant CartModule
+participant CustomerModule
+
+External User->BookingPortal:use link: (https://dev-booking.appointy.com/@1st1l)
+note over BookingPortal#edede8:Fill Booking Details \n\n(customer email: abc@gmail.com)
+
+
+BookingPortal->AppointmentModule:SerializeAppointment()
+loop  for each customer (in appointment object)
+AppointmentModule->CustomerModule:CreateCustomer()
+note over CustomerModule#f5e78c:In our case, customer "abc@gmail.com" is created
+AppointmentModule<-CustomerModule:return customer (if not exists, create new)
+end
+BookingPortal<-AppointmentModule:
+
+
+alt If External User Logged in (xyz@gmail.com)
+BookingPortal->CartModule:UpsertCart()
+CartModule->CustomerModule:CreateCustomer()
+note over CustomerModule#f5e78c:In our case, customer "xyz@gmail.com" is created
+CartModule<-CustomerModule:return customer (if not exists, create new)
+BookingPortal<-CartModule:
+space
+else Proceed as Guest User
+BookingPortal->CartModule:UpsertGuestCart()
+note over CartModule#f7c6c6:here, CartCustomer contains the appointment customer for which booking is made.\n(note that customer is already created in SerializeAppointment()\n\nTherefore, no new customer is created here.
+BookingPortal<-CartModule:
+end
+
+
+
+note over BookingPortal#edede8:Complete Booking journey
+External User<-BookingPortal:

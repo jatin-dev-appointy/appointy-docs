@@ -1,0 +1,34 @@
+title BusinessOwner Side Customer Creation Flow
+
+actor BusinessOwner
+participant Deployment
+participant CustomerModule
+participant UserModule
+participant Background
+database DB
+
+==BusinessOwner Side==
+
+BusinessOwner->Deployment:Create Customer API call
+Deployment->CustomerModule:CreateCustomer(): with email xyz@gmail.com
+CustomerModule->UserModule:GetUserProfileByEmail(): Get User with Email: xyz@gmail.com
+alt If not Found
+CustomerModule<-UserModule:error: user not found
+CustomerModule->UserModule:CreateUserWithLogin()
+UserModule->DB:CreateUserProfile()
+UserModule<-DB:
+UserModule->DB:CreateUserLogin(): {id: "usr_123", password: "usr_123"}
+UserModule<-DB:
+CustomerModule<-UserModule:return New User
+space
+else If Already Exist
+CustomerModule<-UserModule:return Existing User
+end
+CustomerModule->CustomerModule:Assign Customer Role
+Deployment<-CustomerModule:
+BusinessOwner<-Deployment:
+space
+==Background Flow==
+CustomerModule->(02)Background:Event: New Customer Added
+note over Background:Send Email To Customer (Template can be customized)
+====

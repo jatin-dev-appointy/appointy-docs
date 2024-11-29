@@ -1,0 +1,24 @@
+title Client Side Customer Creation Flow
+
+actor External User
+participant BookingPortal
+participant AppointmentModule
+participant CustomerModule
+participant UserModule
+
+External User->BookingPortal:use link: (https://qa-selecttime.appointy.com/1st8l)
+note over BookingPortal:Fill Booking Details
+BookingPortal->AppointmentModule:SerializeAppointment(): Validate Client Information here
+AppointmentModule->CustomerModule:Get Appointment's Consumers to Validate
+alt If Not Found
+AppointmentModule<-CustomerModule:error: customer not found
+space
+AppointmentModule->CustomerModule:CreateCustomer()
+note over CustomerModule #FF7F7F:Refer Previous Diagram ....
+AppointmentModule<-CustomerModule:return new 'Customer'
+else if exists
+AppointmentModule<-CustomerModule:return existing 'Customer'
+end
+BookingPortal<-AppointmentModule:
+note over BookingPortal:Complete Booking journey
+External User<-BookingPortal:
