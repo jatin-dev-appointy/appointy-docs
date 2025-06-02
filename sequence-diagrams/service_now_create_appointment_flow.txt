@@ -1,0 +1,76 @@
+title Service Now Create Appointment Flow
+participant Deployment
+participant Background
+participant "Tasklist - Email" as EmailTasklist
+participant "<link:https://gitlab.com/appointy/waqt/service-now>appointy/waqt/service-now</link>" as ServiceServiceNow
+participant "<link:https://github.com/AppointyTech/saastack-Backend-slug>saastack/slug</link>" as ServiceSlug
+participant "<link:https://github.com/AppointyTech/saastack-Backend-company>saastack/company</link>" as ServiceCompany
+participant "<link:https://github.com/AppointyTech/saastack-Backend-location>saastack/location</link>" as ServiceLocation
+participant "<link:https://gitlab.com/appointy/waqt/intake-form>appointy/waqt/intake-form</link>" as ServiceIntakeForm
+participant "<link:https://github.com/AppointyTech/saastack-Backend-user>saastack/user</link>" as ServiceUser
+Deployment->Background:Create Appointment (Async)
+Background->Background:Create Appointment Background\n
+Background->EmailTasklist:Received by EmailTasklist\n\n(EVENT_Appointments_CreateAppointment_Background)\n
+==Workflow Started (Appointment Created)==
+note over EmailTasklist:Service-Now Integration
+EmailTasklist->ServiceSlug:GetSlug - To Check IsJNJ (via LocationId)
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceServiceNow:IsJnJ - To Check whether that slug is JNJ location
+EmailTasklist<-ServiceServiceNow:
+space
+group GetBusinessDetails() - Fetch Business Details
+EmailTasklist->ServiceCompany:GetCompany - To Fill Business Details
+EmailTasklist<-ServiceCompany:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via companyId)
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceLocation:GetLocation - To Fill business Details (via locationId)
+EmailTasklist<-ServiceLocation:
+space
+EmailTasklist->ServiceSlug:GetSlug - To Fill in Business Details (via locationId)
+EmailTasklist<-ServiceSlug:
+end
+space
+group helpers.AppointmentFormSubmission() - Fetch Information Before Ticket Creation
+EmailTasklist->ServiceIntakeForm:ListIntakeFormSubmissions - List Submissions
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:BatchGetIntakeForms - List Forms
+EmailTasklist<-ServiceIntakeForm:
+end
+space
+EmailTasklist->ServiceServiceNow:ConfigAnswers - Convert hardcoded answers in another languages
+EmailTasklist<-ServiceServiceNow:
+space
+EmailTasklist->ServiceSlug:GetSlug - To be used in CreateServiceNowIncident request.
+EmailTasklist<-ServiceSlug:
+space
+EmailTasklist->ServiceUser:GetUserProfile - Fetch CreatedBy to be filled in Ticket using userId in appointment
+EmailTasklist<-ServiceUser:
+space
+alt If New Ticket
+EmailTasklist->ServiceServiceNow:CreateServiceNowIncident - Service Now API call
+EmailTasklist<-ServiceServiceNow:Ticket Info
+space
+group UpdateTicketDetailsInAppointment()
+EmailTasklist->ServiceIntakeForm:ListIntakeFormSubmissions - Fetch Pre Appointment values\n
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:BatchGetIntakeForms - Fetch corresponding Intake Forms for the submissions.
+EmailTasklist<-ServiceIntakeForm:
+space
+EmailTasklist->ServiceIntakeForm:UpdateIntakeFormSubmission - Fill Updated Ticket Value in  Appointment Intake Form Submissions.
+EmailTasklist<-ServiceIntakeForm:
+end
+else 
+EmailTasklist->ServiceServiceNow:AddCommentInIncident - If Existing TicketId is there in form
+EmailTasklist<-ServiceServiceNow:
+end
+space
+space
+note over EmailTasklist:Proceed with Create Appointment Email Sending Flow
+Background<-EmailTasklist:
+
+Deployment<-Background:
