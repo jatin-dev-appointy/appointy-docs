@@ -1,0 +1,60 @@
+title Admin Side Matching Rule CRUD
+
+participant Deployment
+participant "<link:https://github.com/AppointyTech/saastack-backend-matching-rule>go.saastack.io/matching-rule</link>" as MatchingRuleService
+database SettingStore
+
+
+space
+==Create==
+Deployment->MatchingRuleService:CreateMatchingRule()
+alt if (type == SERVICE_TEMPLATE)
+MatchingRuleService->SettingStore:CreateSettings() - (Parent: companyId, Type: SettingName_ServiceTemplateMatchingRule)
+MatchingRuleService<-SettingStore:
+Deployment<-MatchingRuleService:success
+else else
+
+Deployment<-MatchingRuleService:error (Undefined Matching Rule type)
+end
+
+space
+==Get==
+Deployment->MatchingRuleService:GetMatchingRule()
+MatchingRuleService->SettingStore:GetSettings() - Get Setting via Id
+MatchingRuleService<-SettingStore:
+Deployment<-MatchingRuleService:
+
+space
+==List==
+Deployment->MatchingRuleService:ListMatchingRule()
+MatchingRuleService->SettingStore:ListSettings() - List Settings via Id
+MatchingRuleService<-SettingStore:
+Deployment<-MatchingRuleService:
+
+
+space
+==Update==
+Deployment->MatchingRuleService:UpdateMatchingRule()
+MatchingRuleService->SettingStore:GetSettings() - Get Setting via Id
+MatchingRuleService<-SettingStore:
+alt if (set.Type == SettingName_ServiceTemplateMatchingRule && rule.Type != SERVICE_TEMPLATE)
+Deployment<-MatchingRuleService:error (matching rule type can't be updated !!!)
+else else
+MatchingRuleService->SettingStore:UpdateSettings() - Update in Setting Store
+MatchingRuleService<-SettingStore:
+Deployment<-MatchingRuleService:success
+end
+
+
+space
+==Delete==
+Deployment->MatchingRuleService:DeleteMatchingRule()
+MatchingRuleService->SettingStore:DeleteSettings() - Delete Setting via Id
+MatchingRuleService<-SettingStore:
+Deployment<-MatchingRuleService:
+
+space
+==END-OF-FLOW==
+
+
+
