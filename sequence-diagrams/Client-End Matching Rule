@@ -1,0 +1,30 @@
+title Client-End Matching Rule
+
+participant Deployment
+participant "<link:https://gitlab.com/appointy/waqt/appointment>go.appointy.com/waqt/appointment</link> (package: availability)" as AppointmentService
+participant "<link:https://github.com/AppointyTech/saastack-backend-matching-rule>go.saastack.io/matching-rule</link>" as MatchingRuleService
+
+note over Deployment:Client End Booking Flow
+Deployment->AppointmentService:ImprovedListServicesOrEmployees() - This will Filter Services based on Matching Rules present on Admin Side
+AppointmentService->AppointmentService:all other calculations related to calculating availablity\nlike getOpenHours(), getLinks() etc...
+AppointmentService->AppointmentService:getServices() - list available services
+group Matching Rule Layer
+note over AppointmentService:Example Input (matching-rule-field): \n{\n  filter.serviceTemplateMatchingRules: map[string]string{}{\n    "weight": 30, "age":10\n  },\n  ....\n}\n
+AppointmentService->AppointmentService:create an empty map - serviceTemplateIdsMap{}
+alt if (length(filter.serviceTemplateMatchingRules) > 0)
+AppointmentService->MatchingRuleService:ListMatchingRule() - This will fetch All the Existing Matching Rules for that Company
+AppointmentService<-MatchingRuleService:
+loop for each {Rule} in {MatchingRules}
+alt if {Rule} matches fields of {filter.serviceTemplateMatchingRules}
+AppointmentService->AppointmentService:- Fetch ServiceTemplateIds linked with {Rule}\n\n- fill template-ids in {serviceTemplateIdsMap}\n
+end
+end
+end
+
+alt if (length(serviceTemplateIdsMap) > 0)
+AppointmentService->AppointmentService:- filter services based on template-id existance in  {serviceTemplateIdsMap}
+end
+
+end
+AppointmentService->AppointmentService:continue processing rest of the availability flow....
+Deployment<-AppointmentService:
